@@ -1,106 +1,96 @@
-import { api, AddAssetsResponseDto, AssetResponseDto } from '@api';
-import {
-	notificationController,
-	NotificationType
-} from '$lib/components/shared-components/notification/notification';
+import { notificationController, NotificationType } from '$lib/components/shared-components/notification/notification';
 import { downloadAssets } from '$lib/stores/download';
+import { AddAssetsResponseDto, api, AssetResponseDto } from '@api';
 
 export const addAssetsToAlbum = async (
-	albumId: string,
-	assetIds: Array<string>,
-	key: string | undefined = undefined
+  albumId: string,
+  assetIds: Array<string>,
+  key: string | undefined = undefined,
 ): Promise<AddAssetsResponseDto> =>
-	api.albumApi
-		.addAssetsToAlbum({ id: albumId, addAssetsDto: { assetIds }, key })
-		.then(({ data: dto }) => {
-			if (dto.successfullyAdded > 0) {
-				// This might be 0 if the user tries to add an asset that is already in the album
-				notificationController.show({
-					message: `Added ${dto.successfullyAdded} to ${dto.album?.albumName}`,
-					type: NotificationType.Info
-				});
-			}
+  api.albumApi.addAssetsToAlbum({ id: albumId, addAssetsDto: { assetIds }, key }).then(({ data: dto }) => {
+    if (dto.successfullyAdded > 0) {
+      // This might be 0 if the user tries to add an asset that is already in the album
+      notificationController.show({
+        message: `Added ${dto.successfullyAdded} to ${dto.album?.albumName}`,
+        type: NotificationType.Info,
+      });
+    }
 
-			return dto;
-		});
+    return dto;
+  });
 
-export async function bulkDownload(
-	fileName: string,
-	assets: AssetResponseDto[],
-	onDone?: () => void,
-	key?: string
-) {
-	const assetIds = assets.map((asset) => asset.id);
+export async function bulkDownload(fileName: string, assets: AssetResponseDto[], onDone?: () => void, key?: string) {
+  const assetIds = assets.map((asset) => asset.id);
 
-	try {
-		// let skip = 0;
-		let count = 0;
-		let done = false;
+  try {
+    // let skip = 0;
+    let count = 0;
+    let done = false;
 
-		while (!done) {
-			count++;
+    while (!done) {
+      count++;
 
-			const downloadFileName = fileName + `${count === 1 ? '' : count}.zip`;
-			downloadAssets.set({ [downloadFileName]: 0 });
+      const downloadFileName = fileName + `${count === 1 ? '' : count}.zip`;
+      downloadAssets.set({ [downloadFileName]: 0 });
 
-			let total = 0;
+      let total = 0;
 
-			const { data, status, headers } = await api.assetApi.downloadFiles(
-				{ downloadFilesDto: { assetIds }, key },
-				{
-					responseType: 'blob',
-					onDownloadProgress: function (progressEvent) {
-						const request = this as XMLHttpRequest;
-						if (!total) {
-							total = Number(request.getResponseHeader('X-Immich-Content-Length-Hint')) || 0;
-						}
+      const { data, status, headers } = await api.assetApi.downloadFiles(
+        { downloadFilesDto: { assetIds }, key },
+        {
+          responseType: 'blob',
+          onDownloadProgress: function (progressEvent) {
+            const request = this as XMLHttpRequest;
+            if (!total) {
+              total = Number(request.getResponseHeader('X-Immich-Content-Length-Hint')) || 0;
+            }
 
-						if (total) {
-							const current = progressEvent.loaded;
-							downloadAssets.set({ [downloadFileName]: Math.floor((current / total) * 100) });
-						}
-					}
-				}
-			);
+            if (total) {
+              const current = progressEvent.loaded;
+              downloadAssets.set({ [downloadFileName]: Math.floor((current / total) * 100) });
+            }
+          },
+        },
+      );
 
-			const isNotComplete = headers['x-immich-archive-complete'] === 'false';
-			const fileCount = Number(headers['x-immich-archive-file-count']) || 0;
-			if (isNotComplete && fileCount > 0) {
-				// skip += fileCount;
-			} else {
-				onDone?.();
-				done = true;
-			}
+      const isNotComplete = headers['x-immich-archive-complete'] === 'false';
+      const fileCount = Number(headers['x-immich-archive-file-count']) || 0;
+      if (isNotComplete && fileCount > 0) {
+        // skip += fileCount;
+      } else {
+        onDone?.();
+        done = true;
+      }
 
-			if (!(data instanceof Blob)) {
-				return;
-			}
+      if (!(data instanceof Blob)) {
+        return;
+      }
 
-			if (status === 201) {
-				const fileUrl = URL.createObjectURL(data);
-				const anchor = document.createElement('a');
-				anchor.href = fileUrl;
-				anchor.download = downloadFileName;
+      if (status === 201) {
+        const fileUrl = URL.createObjectURL(data);
+        const anchor = document.createElement('a');
+        anchor.href = fileUrl;
+        anchor.download = downloadFileName;
 
-				document.body.appendChild(anchor);
-				anchor.click();
-				document.body.removeChild(anchor);
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
 
-				URL.revokeObjectURL(fileUrl);
+        URL.revokeObjectURL(fileUrl);
 
-				// Remove item from download list
-				setTimeout(() => {
-					downloadAssets.set({});
-				}, 2000);
-			}
-		}
-	} catch (e) {
-		console.error('Error downloading file ', e);
-		notificationController.show({
-			type: NotificationType.Error,
-			message: 'Error downloading file, check console for more details.'
-		});
-	}
+        // Remove item from download list
+        setTimeout(() => {
+          downloadAssets.set({});
+        }, 2000);
+      }
+    }
+  } catch (e) {
+    console.error('Error downloading file ', e);
+    notificationController.show({
+      type: NotificationType.Error,
+      message: 'Error downloading file, check console for more details.',
+    });
+  }
 }
 
 /**
@@ -108,50 +98,50 @@ export async function bulkDownload(
  * an empty string when not found.
  */
 export function getFilenameExtension(filename: string): string {
-	const lastIndex = Math.max(0, filename.lastIndexOf('.'));
-	const startIndex = (lastIndex || Infinity) + 1;
-	return filename.slice(startIndex).toLowerCase();
+  const lastIndex = Math.max(0, filename.lastIndexOf('.'));
+  const startIndex = (lastIndex || Infinity) + 1;
+  return filename.slice(startIndex).toLowerCase();
 }
 
 /**
  * Returns the filename of an asset including file extension
  */
 export function getAssetFilename(asset: AssetResponseDto): string {
-	const fileExtension = getFilenameExtension(asset.originalPath);
-	return `${asset.originalFileName}.${fileExtension}`;
+  const fileExtension = getFilenameExtension(asset.originalPath);
+  return `${asset.originalFileName}.${fileExtension}`;
 }
 
 /**
  * Returns the MIME type of the file and an empty string when not found.
  */
 export function getFileMimeType(file: File): string {
-	const mimeTypes: Record<string, string> = {
-		'3gp': 'video/3gpp',
-		arw: 'image/x-sony-arw',
-		dng: 'image/dng',
-		heic: 'image/heic',
-		heif: 'image/heif',
-		insp: 'image/jpeg',
-		insv: 'video/mp4',
-		nef: 'image/x-nikon-nef',
-		raf: 'image/x-fuji-raf',
-		srw: 'image/x-samsung-srw'
-	};
-	// Return the MIME type determined by the browser or the MIME type based on the file extension.
-	return file.type || (mimeTypes[getFilenameExtension(file.name)] ?? '');
+  const mimeTypes: Record<string, string> = {
+    '3gp': 'video/3gpp',
+    arw: 'image/x-sony-arw',
+    dng: 'image/dng',
+    heic: 'image/heic',
+    heif: 'image/heif',
+    insp: 'image/jpeg',
+    insv: 'video/mp4',
+    nef: 'image/x-nikon-nef',
+    raf: 'image/x-fuji-raf',
+    srw: 'image/x-samsung-srw',
+  };
+  // Return the MIME type determined by the browser or the MIME type based on the file extension.
+  return file.type || (mimeTypes[getFilenameExtension(file.name)] ?? '');
 }
 
 /**
  * Returns aspect ratio for the asset
  */
 export function getAssetRatio(asset: AssetResponseDto) {
-	let height = asset.exifInfo?.exifImageHeight || 235;
-	let width = asset.exifInfo?.exifImageWidth || 235;
-	const orientation = Number(asset.exifInfo?.orientation);
-	if (orientation) {
-		if (orientation == 6 || orientation == -90) {
-			[width, height] = [height, width];
-		}
-	}
-	return { width, height };
+  let height = asset.exifInfo?.exifImageHeight || 235;
+  let width = asset.exifInfo?.exifImageWidth || 235;
+  const orientation = Number(asset.exifInfo?.orientation);
+  if (orientation) {
+    if (orientation == 6 || orientation == -90) {
+      [width, height] = [height, width];
+    }
+  }
+  return { width, height };
 }
