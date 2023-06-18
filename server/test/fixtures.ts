@@ -233,6 +233,7 @@ export const assetEntityStub = {
     sharedLinks: [],
     faces: [],
     sidecarPath: null,
+    isReadOnly: false,
   }),
   noWebpPath: Object.freeze<AssetEntity>({
     id: 'asset-id',
@@ -263,6 +264,7 @@ export const assetEntityStub = {
     originalFileName: 'asset-id.ext',
     faces: [],
     sidecarPath: null,
+    isReadOnly: false,
   }),
   noThumbhash: Object.freeze<AssetEntity>({
     id: 'asset-id',
